@@ -1,0 +1,16 @@
+# Orbita OS - tabela de particoes para o Cardputer ADV (flash de 8 MB)
+#
+#  factory  = o proprio Orbita (sempre volta pra ca num reset por botao/liga-desliga)
+#             1,875 MB: cabe Wi-Fi + servidor web + USB + M5Cardputer com folga
+#  ota_0/1  = dois "slots" de 2,5 MB para firmwares inteiros (ex.: Hazke e GLIDE)
+#  spiffs   = LittleFS compartilhado ("flash interna" no gerenciador de arquivos;
+#             o Hazke guarda os saves internos aqui)
+#
+# Name,     Type, SubType,  Offset,   Size
+nvs,        data, nvs,      0x9000,   0x5000
+otadata,    data, ota,      0xE000,   0x2000
+factory,    app,  factory,  0x10000,  0x1E0000
+app0,       app,  ota_0,    0x1F0000, 0x280000
+app1,       app,  ota_1,    0x470000, 0x280000
+spiffs,     data, spiffs,   0x6F0000, 0x100000
+coredump,   data, coredump, 0x7F0000, 0x10000
