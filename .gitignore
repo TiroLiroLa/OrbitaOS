@@ -1,0 +1,7 @@
+.pio/
+.vscode/
+out/
+bootloader/build/
+bootloader/sdkconfig
+bootloader/sdkconfig.old
+bootloader/managed_components/

@@ -1,0 +1,49 @@
+# Compila o bootloader e o sistema na nuvem do GitHub a cada push.
+# Os arquivos prontos aparecem em Actions -> (execucao) -> Artifacts -> "orbita".
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bootloader Orbita (ESP-IDF)
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.1.4
+          target: esp32s3
+          path: bootloader
+          command: idf.py bootloader
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ hashFiles('platformio.ini') }}
+
+      - name: Sistema Orbita (PlatformIO)
+        run: |
+          pip install platformio esptool
+          pio run -e cardputer-adv
+
+      - name: Empacotar
+        run: |
+          sudo chown -R "$USER" bootloader/build || true
+          ESPTOOL=esptool.py bash tools/flash.sh --merge
+          cp bootloader/build/bootloader/bootloader.bin out/
+          cp .pio/build/cardputer-adv/partitions.bin out/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orbita
+          path: out/
