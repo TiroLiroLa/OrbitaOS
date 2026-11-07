@@ -1,167 +1,115 @@
 # Órbita OS — arquitetura e roteiro
 
-O Órbita é o **firmware principal** do **M5Stack Cardputer ADV**: o núcleo que amarra tudo. Ele tem funções de conveniência próprias (notas, arquivos, rede, USB) e um menu para **trocar de firmware** quando o usuário quer um app grande, como o jogo **Hazke** ou o synth **GLIDE**.
+O Órbita é um **firmware único e completo** para o **M5Stack Cardputer ADV**. Ele não instala nada: tudo o que ele faz já vem no arquivo de gravação, inclusive o sintetizador **GLIDE** original.
 
-Hardware: ESP32‑S3FN8 a 240 MHz, 8 MB de flash, **sem PSRAM** (~512 KB de SRAM), tela ST7789V2 240×135, teclado 56 teclas (TCA8418), áudio ES8311, IMU BMI270, IR, microSD.
+Hardware: ESP32‑S3FN8 a 240 MHz, 8 MB de flash, **sem PSRAM** (~512 KB de SRAM), tela ST7789V2 240×135, teclado 56 teclas (TCA8418), áudio ES8311, IMU BMI270, IR, microSD, Bluetooth LE, USB OTG.
 
-## 1. Dois tipos de app
+## 1. O GLIDE dentro do Órbita
 
-| Tipo | Onde roda | Exemplos | Troca |
-|---|---|---|---|
-| **Apps do Órbita** (nativos) | dentro do próprio firmware | Notas, Arquivos, Rede, USB, Wi‑Fi, Ajustes, Sistema | instantânea |
-| **Firmwares completos** (slots) | uma partição própria, o chip reinicia neles | Hazke, GLIDE | ~1 s; **BtnRst** volta ao Órbita |
+O repositório do GLIDE (CHARL3X) publica só o binário (`dist/GLIDE.bin`), não o código-fonte. Então ele não pode ser compilado como app nativo. Em vez disso:
 
-Por que o Hazke e o GLIDE ficam em slots:
+- O `GLIDE.bin` oficial, **sem modificação**, fica em `third_party/glide/` e é gravado numa partição fixa (`glide`) junto com o Órbita, no mesmo `orbita-full.bin`.
+- No menu, **GLIDE** aponta o `otadata` para essa partição e reinicia (~1 s).
+- O **bootloader do Órbita** volta para o sistema em qualquer reset por botão ou ao ligar. Já um reinício por software, como o do GLIDE ao segurar `` ` ``, continua no GLIDE.
 
-| Programa | Licença | Código | Como entra |
-|---|---|---|---|
-| **Hazke** (therezor) | MIT | aberto, sketch Arduino | binário no slot (porte nativo é possível no futuro) |
-| **GLIDE** (CHARL3X) | PolyForm Noncommercial 1.0 | o repositório publica o `GLIDE.bin`, não o código | sempre binário no slot |
+Licença: PolyForm Noncommercial 1.0.0. Redistribuir o binário para fins não comerciais é permitido, desde que vão junto o texto da licença, a linha `Required Notice` e o `NOTICES.txt`. O build já coloca esses três na página Releases. O nome GLIDE só aparece para se referir ao GLIDE original; o ícone do menu é desenho próprio.
 
-> Uso pessoal e não comercial do GLIDE é livre. O Órbita não embute nem redistribui o GLIDE: o usuário copia o `GLIDE.bin` oficial para o cartão.
+### Cuidado com a NVS
+
+O GLIDE guarda os ajustes dele na partição **NVS** e, se ela encher, limpa a área inteira sozinho. Por isso:
+- O Órbita **não usa a NVS** para os ajustes nem para as senhas de Wi‑Fi. Esses dados ficam em `/.orbita/` na flash interna (LittleFS); o Wi‑Fi roda com `WiFi.persistent(false)`.
+- A NVS ficou com 64 KB, para encher bem menos.
+- O que continua na NVS, e pode sumir se o GLIDE limpar a área: o vínculo do Bluetooth (aí é só parear de novo) e a calibração de rádio (refeita sozinha).
+
+A flash interna usa um **subtipo próprio (0x40)** de partição. Assim, nenhum firmware que procure uma partição "spiffs" consegue formatá-la por engano.
 
 ## 2. Mapa da flash (8 MB)
 
 ```
 0x000000  bootloader Órbita        (≤ 32 KB)
 0x008000  tabela de partições
-0x009000  nvs        20 KB         ajustes, redes Wi-Fi, nomes dos slots (e dados dos apps)
-0x00E000  otadata     8 KB         qual partição roda no próximo esp_restart()
-0x010000  factory   1,875 MB       ► o Órbita
-0x1F0000  app0       2,5 MB        ► slot 1 (ex.: Hazke)
-0x470000  app1       2,5 MB        ► slot 2 (ex.: GLIDE)
-0x6F0000  spiffs      1 MB         LittleFS = "flash interna" (saves internos do Hazke também)
+0x009000  nvs        64 KB         GLIDE, vínculo Bluetooth, calibração de rádio
+0x019000  otadata     8 KB         qual app roda no próximo esp_restart()
+0x020000  factory     3 MB         ► o Órbita
+0x320000  glide     1,5 MB         ► GLIDE original (GLIDE.bin ~0,95 MB)
+0x4A0000  orbitafs  3,3 MB         ► flash interna (LittleFS): notas, arquivos, /.orbita
 0x7F0000  coredump   64 KB
 ```
 
-O cartão SD é o armazenamento principal de dados (notas, arquivos, `.bin` dos apps). Código só executa a partir da flash interna — por isso os firmwares completos precisam de um slot.
+O `orbita-full.bin` vai de 0x0 até o fim do GLIDE. Gravá-lo **não toca** a `orbitafs`, então notas e ajustes sobrevivem a atualizações. O `orbita-os.bin` (0x20000) atualiza só o sistema.
 
-## 3. Como o boot funciona
-
-O **bootloader de 2º estágio customizado** (`bootloader/`, baseado no exemplo `bootloader_override` do ESP‑IDF) decide pela causa do reset:
+## 3. Boot
 
 ```
-     reset por software (esp_restart)        ligar / botão RST / USB / WDT
-     ou deep sleep                                      │
-                 │                                      ▼
-                 ▼                               partição factory
-     partição escolhida no otadata               = Órbita
-     = firmware do slot
+     reset por software (esp_restart)        ligar / BtnRst / USB / WDT
+                 │                                      │
+                 ▼                                      ▼
+     partição do otadata (GLIDE)                 factory = Órbita
 ```
 
-* O Órbita abre um firmware com `esp_ota_set_boot_partition(slot)` + `esp_restart()`.
-* O **BtnRst sempre volta ao Órbita**, sem o firmware saber de nada.
-* Firmwares que se reiniciam sozinhos continuam neles mesmos (ex.: no GLIDE, segurar `` ` `` reinicia no GLIDE).
-* Quando o próprio Órbita quer reiniciar, ele antes aponta o otadata para a factory.
+O Órbita procura a assinatura `ORBITA-BOOT-1` nos primeiros 32 KB da flash. Sem ela, a barra de status mostra **BL!** e o sistema avisa antes de abrir o GLIDE, porque aí o BtnRst não volta.
 
-O Órbita procura a assinatura `ORBITA-BOOT-1` nos primeiros 32 KB da flash. Sem ela, a barra de status mostra **BL!** e ele avisa antes de abrir um firmware.
+## 4. Apps
 
-## 4. Funções do Órbita
+| App | Atalho | O que faz |
+|---|---|---|
+| **GLIDE** | `g` | abre o GLIDE embutido |
+| **Apresentação** | `a` | teclado Bluetooth LE + USB para passar slides; cronômetro / regressivo com alertas |
+| **Notas** | `n` | notas `.txt` em `/orbita/notas` (SD; sem cartão, flash interna) |
+| **Arquivos** | `f` | SD e flash interna: editar texto, copiar/recortar/colar entre volumes, renomear, pastas, apagar |
+| **Rede** | `r` | servidor web com gerenciador de arquivos; usuário `orbita` + PIN; Wi‑Fi de casa ou rede própria `Orbita-XXXX` com QR code |
+| **USB** | `u` | cartão SD como pendrive |
+| **Wi‑Fi** | `w` | procurar, conectar (lembra 5 redes), esquecer, rede própria |
+| **Ajustes** | `j` | brilho, escurecer, cor, sons, abrir o GLIDE ao ligar, reiniciar |
+| **Sistema** | `s` | bootloader, RAM, armazenamento, rede, GLIDE, Bluetooth, partições |
 
-| App | O que faz |
-|---|---|
-| **Apps** | lista os slots: abrir (troca o firmware), substituir por outro `.bin`, renomear, apagar; instalar do SD |
-| **Notas** | notas `.txt` em `/orbita/notas` (no SD; sem cartão, na flash interna); editor com cursor, rolagem, quebra de linha |
-| **Arquivos** | SD e flash interna: abrir/editar texto, instalar `.bin`, copiar/recortar/colar (também entre volumes), renomear, nova pasta, novo arquivo, apagar pastas inteiras |
-| **Rede** | servidor web: gerenciador de arquivos no navegador, enviar arquivos (arrastar e soltar), baixar, renomear, apagar, **instalar `.bin` num slot e abrir firmware pelo navegador**. Usuário `orbita` + PIN na tela. Funciona no Wi‑Fi de casa (`http://IP` ou `orbita.local`) ou criando a rede própria `Orbita-XXXX` — o QR code na tela conecta o celular |
-| **USB** | o cartão SD vira pendrive no computador pelo USB‑C; o sistema não toca no cartão enquanto isso |
-| **Wi‑Fi** | procurar redes, conectar (lembra até 5), esquecer, criar rede própria, desligar |
-| **Ajustes** | brilho, escurecer tela, cor de destaque, abrir o último firmware ao ligar, sons, reiniciar |
-| **Sistema** | bootloader, RAM, armazenamento, rede, slots, partições, bateria |
+### Controle de apresentação
 
-## 5. Camadas do código
+- **Bluetooth:** `BLE HID` com o nome "Orbita Apresentador". O pareamento é "Just Works" com vínculo, então o computador reconecta sozinho. O Bluetooth só liga com o app aberto e para de anunciar ao sair.
+- **USB:** teclado TinyUSB, junto com o disco do modo pendrive e a serial. Só no build padrão (`cardputer-adv`).
+- **Teclas enviadas:** setas ← → (ou PageUp/PageDown, tecla `k`), F5, Shift+F5, Esc, B (tela preta) e W (tela branca). Funcionam em PowerPoint, Google Slides, Keynote e LibreOffice Impress.
+- **Tempo:** começa sozinho no primeiro slide. No regressivo há bipes a 5 min do fim, a 1 min e no zero; depois disso o número pisca com "+".
+- A tela não escurece enquanto o app está aberto (`App::keepAwake()`).
+
+## 5. Código
 
 ```
 src/
-├── main.cpp              setup()/loop() → Kernel
+├── main.cpp
 ├── core/
-│   ├── Kernel            pilha de apps, laço, energia, instalar/abrir firmware, barra de status
-│   ├── App.h             classe base dos apps nativos
-│   ├── Input             teclado → eventos (setas ; , . /  Esc `), repetição de tecla
-│   ├── UI                fontes, lista com rolagem, ícones vetoriais, quebra de texto
-│   ├── Dialogs           Confirmar, Escolher, Digitar texto
-│   ├── Storage           volumes SD + flash (LittleFS), copiar/mover/apagar recursivo
-│   ├── SlotManager       slots: instalar de qualquer volume, abrir, apagar, renomear
-│   ├── Net               Wi-Fi não-bloqueante: busca, conexão, redes salvas, ponto de acesso
-│   ├── UsbDrive          disco USB (TinyUSB MSC) lendo setores do SD
-│   ├── Settings / Theme  ajustes na NVS, paleta
+│   ├── Kernel        pilha de apps, laço, energia, abrir o GLIDE, barra de status
+│   ├── App.h         classe base (render, onKey, update, keepAwake...)
+│   ├── Input, UI, Dialogs, Theme
+│   ├── Storage       volumes SD + flash (orbitafs), copiar/mover/apagar recursivo
+│   ├── KvFile        "chave<TAB>valor" na flash: ajustes e redes Wi-Fi
+│   ├── Settings      ajustes em /.orbita/ajustes
+│   ├── Glide         partição do GLIDE: presente? abrir
+│   ├── Hid           teclado Bluetooth LE + USB
+│   ├── Net           Wi-Fi não-bloqueante
+│   └── UsbDrive      disco USB (MSC) lendo setores do SD
 └── apps/
-    ├── HomeApp           carrossel: firmwares instalados + apps do Órbita
-    ├── FirmwareApp       "Apps": gerenciar e trocar firmwares
-    ├── NotesApp, EditorApp
-    ├── FilesApp          gerenciador de arquivos local
-    ├── LanApp + WebUi.h  servidor web e página do navegador
-    ├── UsbApp, WifiApp, SettingsApp, SystemApp
+    ├── HomeApp, PresenterApp, NotesApp, EditorApp, FilesApp
+    ├── LanApp + WebUi.h, UsbApp, WifiApp, SettingsApp, SystemApp
+third_party/glide/    GLIDE.bin oficial + LICENSE + NOTICES.txt
+tools/flash.sh        gravar / gerar orbita-full.bin
+tools/update-glide.sh atualizar o GLIDE embutido
 ```
 
-**Tela:** tudo é desenhado num sprite de 240×135 (≈64 KB) e enviado de uma vez, sem piscar; só redesenha quando algo muda.
+## 6. Roteiro
 
-**Pilha de apps:** `push/pop` são aplicados depois do evento atual; diálogos são overlays.
+- **Fonte com acentos** (Latin‑1) na interface
+- **Ler pendrive no Cardputer** (USB host)
+- **Relógio** pela internet (NTP) na barra de status e na apresentação
+- **Apresentação:** vibrar o alerta pela caixa de som num padrão diferente, ponteiro laser virtual (mouse HID pelo IMU)
+- Controle remoto IR, gravador de voz, nível (IMU), player de WAV
 
-### Modo USB: detalhe de compilação
+## 7. Checklist no aparelho
 
-O modo pendrive exige o USB em modo OTG (TinyUSB) — é o ambiente padrão `cardputer-adv`. A serial pelo USB continua funcionando. Se o computador não conseguir gravar sozinho nesse modo, desligue o Cardputer, segure **G0** e ligue o cabo. Existe o ambiente `cardputer-adv-sem-usb` (USB nativo do chip) caso prefira abrir mão do pendrive.
+1. Gravar o `orbita-full.bin` → **Sistema** mostra "Bootloader: Orbita" e "GLIDE: gravado".
+2. **GLIDE** abre; segurar `` ` `` reinicia no GLIDE; **BtnRst** volta ao Órbita.
+3. **Apresentação**: parear "Orbita Apresentador" no notebook; `/` e `,` passam os slides; `i` inicia; `b` tela preta; regressivo de 1 min apita e pisca.
+4. Apresentação pelo **cabo USB** (sem Bluetooth).
+5. Mexer nos ajustes, abrir o GLIDE, voltar → ajustes e redes Wi‑Fi continuam.
+6. **Notas**, **Arquivos**, **Rede**, **USB** como antes.
 
-### Como escrever um app nativo
-
-```cpp
-class RelogioApp : public App {
- public:
-  const char* title() const override { return "Relogio"; }
-  bool animating() const override { return true; }
-  void onKey(const KeyEvent& e) override {
-    if (e.nav == Nav::Back) Kernel::get().pop();
-  }
-  void render(M5Canvas& c, const Rect& area) override {
-    c.setFont(ui::title());
-    c.drawString(String(millis() / 1000).c_str(), area.x + 10, area.y + 10);
-  }
-};
-// Em HomeApp::rebuild():
-// items_.push_back({"Relogio", "...", ui::Icon::Generic, 'R', -1,
-//                   []{ Kernel::get().push(new RelogioApp()); }});
-```
-
-## 6. Teclas
-
-| Tecla | Menus | Editor de texto |
-|---|---|---|
-| `,` `/` | ← → | digita `,` `/` |
-| `;` `.` | ↑ ↓ | digita `;` `.` |
-| **fn** + `; , . /` | — | move o cursor |
-| `Enter` | abrir | nova linha |
-| `` ` `` | voltar | sair (pergunta se salva) |
-| `Tab` | menu de opções | dois espaços |
-| `Del` | opções | apagar (fn+Del: para frente) |
-| `ctrl`+`s` | — | salvar |
-| `1`…`9` | abrir firmware do slot | — |
-| Arquivos | `c` copiar · `x` recortar · `v` colar · `f` troca SD/flash · `r` atualizar | |
-| **BtnRst** | dentro de um firmware: volta ao Órbita | |
-
-## 7. Roteiro
-
-### Feito
-- [x] Bootloader Órbita, 2 slots de 2,5 MB, troca de firmware
-- [x] Apps, Notas, Arquivos (SD + flash), Rede (navegador), USB (pendrive), Wi‑Fi, Ajustes, Sistema
-- [x] Instalar e abrir firmware pelo navegador
-- [x] Build automático no GitHub Actions
-
-### Próximos
-- **Fonte com acentos** (Latin‑1) — hoje a interface está sem acento
-- **Pendrive no Cardputer** (USB host): ler um pendrive ligado ao Cardputer por OTG
-- **Backup de saves por firmware**: copiar a flash interna para o SD ao trocar de firmware
-- **Loja Órbita**: catálogo JSON apontando para as releases do Hazke e do GLIDE, download direto para o slot
-- Relógio (NTP), controle remoto IR, gravador de voz, nível (IMU), player de WAV, scripts Lua/Berry no SD
-
-## 8. Checklist de validação no hardware
-
-1. Gravar com `tools/flash.sh` → **Sistema** diz "Bootloader: Orbita".
-2. **USB**: aparece um disco no computador; copiar `hazke-v1.4.0-app.bin` e `GLIDE.bin` para `/orbita/apps/`; ejetar; sair.
-3. **Apps** → instalar Hazke no slot 1 e GLIDE no slot 2.
-4. Abrir o Hazke → **BtnRst** → volta ao Órbita. Abrir o GLIDE → segurar `` ` `` → reinicia no GLIDE → **BtnRst** → Órbita.
-5. **Rede** no Wi‑Fi de casa: abrir o IP no celular, digitar o PIN, enviar um arquivo, instalar um `.bin`, abrir um slot pelo navegador.
-6. **Rede** sem roteador ("rede própria"): escanear o QR, abrir `192.168.4.1`.
-7. **Notas**: criar, editar com fn+setas, salvar, reabrir; sem cartão, criar uma nota na flash.
-8. **Arquivos**: copiar uma pasta do SD para a flash e de volta; apagar a pasta.
-
-O que só o hardware confirma: o código de reset do BtnRst no S3, o disco USB aparecendo com o TinyUSB, se o Hazke e o GLIDE cabem em 2,5 MB cada, e se o Órbita cabe em 1,875 MB.
+O que só o aparelho confirma: Bluetooth e USB HID funcionando ao mesmo tempo que o disco USB, a memória livre com Bluetooth e Wi‑Fi ligados juntos, e o GLIDE rodando a partir da partição nova.
