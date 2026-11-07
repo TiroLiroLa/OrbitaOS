@@ -28,14 +28,14 @@ void PresenterApp::send(uint8_t usage, uint8_t mods, const char* label) {
 
 void PresenterApp::next() {
   bool page = Kernel::get().settings().pageKeys;
-  send(page ? hid::key::PAGE_DOWN : hid::key::RIGHT, 0, "> proximo");
+  send(page ? hid::key::kPageDown : hid::key::kRight, 0, "> proximo");
   if (lastSent_) slide_++;
   if (!running_ && accum_ == 0 && lastSent_) startTimer();  // comeca sozinho no 1o slide
 }
 
 void PresenterApp::prev() {
   bool page = Kernel::get().settings().pageKeys;
-  send(page ? hid::key::PAGE_UP : hid::key::LEFT, 0, "< anterior");
+  send(page ? hid::key::kPageUp : hid::key::kLeft, 0, "< anterior");
   if (lastSent_ && slide_ > 1) slide_--;
 }
 
@@ -141,18 +141,18 @@ void PresenterApp::onKey(const KeyEvent& e) {
   } else if (e.nav == Nav::Left || e.nav == Nav::Up || e.nav == Nav::Del) {
     prev();
   } else if (e.ch == 'i') {
-    send(hid::key::F5, 0, "iniciar (F5)");
+    send(hid::key::kF5, 0, "iniciar (F5)");
     slide_ = 1;
     if (lastSent_) startTimer();
   } else if (e.ch == 'h') {
-    send(hid::key::F5, hid::mod::SHIFT, "deste slide");
+    send(hid::key::kF5, hid::mod::kShift, "deste slide");
     if (lastSent_) startTimer();
   } else if (e.ch == 'e') {
-    send(hid::key::ESC, 0, "encerrar (Esc)");
+    send(hid::key::kEsc, 0, "encerrar (Esc)");
   } else if (e.ch == 'b') {
-    send(hid::key::B, 0, "tela preta");
+    send(hid::key::kB, 0, "tela preta");
   } else if (e.ch == 'w') {
-    send(hid::key::W, 0, "tela branca");
+    send(hid::key::kW, 0, "tela branca");
   } else if (e.ch == 't') {
     if (running_) pauseTimer();
     else startTimer();

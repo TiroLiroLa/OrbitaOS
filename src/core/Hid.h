@@ -9,14 +9,15 @@ namespace hid {
 
 // Codigos de tecla do padrao USB HID (usage page 0x07)
 namespace key {
-constexpr uint8_t A = 0x04, B = 0x05, W = 0x1A;
-constexpr uint8_t ENTER = 0x28, ESC = 0x29, SPACE = 0x2C;
-constexpr uint8_t F5 = 0x3E, PAGE_UP = 0x4B, PAGE_DOWN = 0x4E;
-constexpr uint8_t RIGHT = 0x4F, LEFT = 0x50, DOWN = 0x51, UP = 0x52;
+constexpr uint8_t kA = 0x04, kB = 0x05, kW = 0x1A;
+constexpr uint8_t kEnter = 0x28, kEsc = 0x29, kSpace = 0x2C;
+constexpr uint8_t kF5 = 0x3E, kPageUp = 0x4B, kPageDown = 0x4E;
+constexpr uint8_t kRight = 0x4F, kLeft = 0x50, kDown = 0x51, kUp = 0x52;
 }  // namespace key
 namespace mod {
-constexpr uint8_t CTRL = 0x01, SHIFT = 0x02, ALT = 0x04, GUI = 0x08;
+constexpr uint8_t kCtrl = 0x01, kShift = 0x02, kAlt = 0x04, kGui = 0x08;
 }
+// (nomes com "k" porque a biblioteca do Cardputer define SHIFT, KEY_LEFT... como macros)
 
 constexpr const char* BLE_NAME = "Orbita Apresentador";
 
