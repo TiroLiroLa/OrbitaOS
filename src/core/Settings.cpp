@@ -1,31 +1,32 @@
 #include "Settings.h"
 
-#include "Config.h"
-#include "KvFile.h"
+#include <Preferences.h>
+
+static const char* NS = "orbita";
 
 void Settings::load() {
-  KvFile kv(cfg::FILE_SETTINGS);
-  if (!kv.load()) return;  // primeira vez: fica com os padroes
-  brightness    = (uint8_t)kv.getInt("brilho", brightness);
-  dimSecs       = (uint16_t)kv.getInt("escurecer", dimSecs);
-  accent        = (uint8_t)kv.getInt("cor", accent);
-  autoboot      = kv.getBool("abrir_glide", autoboot);
-  sound         = kv.getBool("sons", sound);
-  talkMinutes   = (uint8_t)kv.getInt("apres_min", talkMinutes);
-  talkCountdown = kv.getBool("apres_regressivo", talkCountdown);
-  pageKeys      = kv.getBool("apres_page", pageKeys);
+  Preferences p;
+  if (!p.begin(NS, true)) return;  // primeira vez: fica com os padroes
+  brightness    = p.getUChar("bright", brightness);
+  dimSecs       = p.getUShort("dim", dimSecs);
+  accent        = p.getUChar("accent", accent);
+  sound         = p.getBool("sound", sound);
+  talkMinutes   = p.getUChar("tmin", talkMinutes);
+  talkCountdown = p.getBool("tdown", talkCountdown);
+  pageKeys      = p.getBool("tpage", pageKeys);
+  p.end();
   if (talkMinutes < 1) talkMinutes = 1;
 }
 
 void Settings::save() const {
-  KvFile kv(cfg::FILE_SETTINGS);
-  kv.setInt("brilho", brightness);
-  kv.setInt("escurecer", dimSecs);
-  kv.setInt("cor", accent);
-  kv.setBool("abrir_glide", autoboot);
-  kv.setBool("sons", sound);
-  kv.setInt("apres_min", talkMinutes);
-  kv.setBool("apres_regressivo", talkCountdown);
-  kv.setBool("apres_page", pageKeys);
-  kv.save();
+  Preferences p;
+  if (!p.begin(NS, false)) return;
+  p.putUChar("bright", brightness);
+  p.putUShort("dim", dimSecs);
+  p.putUChar("accent", accent);
+  p.putBool("sound", sound);
+  p.putUChar("tmin", talkMinutes);
+  p.putBool("tdown", talkCountdown);
+  p.putBool("tpage", pageKeys);
+  p.end();
 }

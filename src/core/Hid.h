@@ -3,7 +3,7 @@
 
 // O Cardputer como teclado do computador (controle de apresentacao).
 //   - Bluetooth (BLE HID): aparece como "Orbita Apresentador"; pareie uma vez.
-//   - USB: quando ligado pelo cabo (so no build padrao, com USB em modo OTG).
+//   - USB: quando ligado pelo cabo (build padrao, com USB em modo OTG).
 // As teclas vao para os dois que estiverem conectados.
 namespace hid {
 

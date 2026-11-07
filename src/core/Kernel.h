@@ -11,7 +11,7 @@
 #include "Storage.h"
 
 // O "nucleo" do Orbita: inicializa o hardware, mantem a pilha de apps,
-// distribui teclas, desenha a tela, cuida de energia e abre o GLIDE.
+// distribui teclas, desenha a tela e cuida de energia.
 class Kernel {
  public:
   static Kernel& get();
@@ -36,7 +36,6 @@ class Kernel {
                  std::function<void(const String&)> onOk, int maxLen = 32);
 
   // Fluxos do sistema
-  void launchGlide();                      // avisa se o bootloader nao for o Orbita
   void rebootToOS();
 
   // Desenho direto na tela (para tarefas que bloqueiam, ex.: gravar flash)
@@ -49,7 +48,6 @@ class Kernel {
 
   Input& input() { return input_; }
   Settings& settings() { return settings_; }
-  bool customBootloader() const { return customBoot_; }
   const char* resetReasonText() const;
 
  private:
@@ -63,7 +61,6 @@ class Kernel {
   void render();
   void drawStatusBar(M5Canvas& c, const char* title);
   void handlePower(uint32_t now);
-  bool detectCustomBootloader();
   void bootSequence();
 
   std::vector<std::unique_ptr<App>> stack_;
@@ -72,7 +69,6 @@ class Kernel {
   Input input_;
   Settings settings_;
 
-  bool customBoot_ = false;
   bool forceRedraw_ = true;
   bool dimmed_ = false;
   uint32_t lastFrame_ = 0;

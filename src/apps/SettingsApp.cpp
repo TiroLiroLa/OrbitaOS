@@ -7,8 +7,7 @@
 static const uint16_t DIM_STEPS[] = {0, 15, 30, 60, 120, 300};
 static constexpr int DIM_COUNT = sizeof(DIM_STEPS) / sizeof(DIM_STEPS[0]);
 
-static const char* LABELS[] = {"Brilho", "Escurecer tela", "Cor de destaque",
-                               "Abrir o GLIDE ao ligar", "Sons do sistema",
+static const char* LABELS[] = {"Brilho", "Escurecer tela", "Cor de destaque", "Sons do sistema",
                                "Reiniciar o Orbita"};
 
 void SettingsApp::onEnter() {
@@ -24,7 +23,6 @@ String SettingsApp::valueText(int row) const {
                           : s.dimSecs < 60 ? String(s.dimSecs) + "s"
                                            : String(s.dimSecs / 60) + "min";
     case Accent:     return theme::ACCENTS[s.accent % theme::ACCENT_COUNT].name;
-    case Autoboot:   return s.autoboot ? "sim" : "nao";
     case Sound:      return s.sound ? "sim" : "nao";
     default:         return "";
   }
@@ -55,10 +53,6 @@ void SettingsApp::change(int row, int dir) {
       s.accent = (uint8_t)((s.accent + (dir < 0 ? -1 : 1) + theme::ACCENT_COUNT) %
                            theme::ACCENT_COUNT);
       k.applyTheme();
-      break;
-    case Autoboot:
-      s.autoboot = !s.autoboot;
-      if (s.autoboot) k.toast("Ao ligar: qualquer tecla cancela");
       break;
     case Sound:
       s.sound = !s.sound;

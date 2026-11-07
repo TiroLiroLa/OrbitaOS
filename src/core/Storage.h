@@ -6,7 +6,8 @@
 
 // Armazenamento do Orbita: dois "volumes".
 //   Vol::SD    - cartao microSD (FAT32), o principal
-//   Vol::Flash - LittleFS na particao "orbitafs" (~3,3 MB), funciona sem cartao.
+//   Vol::Flash - LittleFS na particao "orbitafs", funciona sem cartao. So existe
+//                se o Launcher criou a particao (instalando o orbita-launcher.bin).
 namespace storage {
 
 enum class Vol : uint8_t { SD = 0, Flash = 1 };
@@ -14,12 +15,6 @@ constexpr int VOL_COUNT = 2;
 
 bool begin();          // monta o SD (pode ser chamado de novo para tentar remontar)
 bool beginFlash();     // monta o LittleFS interno
-void unmountSD();
-bool remountSD();
-// Enquanto o cartao esta com o computador (modo pendrive), o sistema nao pode
-// mexer nele: sdOk() passa a responder false.
-void lockSD(bool locked);
-bool sdLocked();
 
 bool sdOk();
 bool flashOk();

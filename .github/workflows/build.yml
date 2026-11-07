@@ -1,7 +1,7 @@
-# Compila o bootloader e o sistema na nuvem do GitHub a cada push.
-# - Os arquivos prontos ficam em Actions -> (execucao) -> Artifacts -> "orbita".
-# - Na branch main, tambem sao publicados em Releases -> "latest", com link fixo:
-#   https://github.com/<usuario>/<repo>/releases/latest/download/orbita-full.bin
+# Compila o Orbita na nuvem do GitHub a cada push.
+# - Arquivos prontos: Actions -> (execucao) -> Artifacts -> "orbita".
+# - Na branch main, tambem vao para Releases -> "latest", com link fixo:
+#   https://github.com/<usuario>/<repo>/releases/latest/download/orbita-launcher.bin
 name: build
 
 on:
@@ -17,14 +17,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Bootloader Orbita (ESP-IDF)
-        uses: espressif/esp-idf-ci-action@v1
-        with:
-          esp_idf_version: v5.1.4
-          target: esp32s3
-          path: bootloader
-          command: idf.py bootloader
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -36,7 +28,7 @@ jobs:
             ~/.cache/pip
           key: pio-${{ hashFiles('platformio.ini') }}
 
-      - name: Sistema Orbita (PlatformIO)
+      - name: Compilar (PlatformIO)
         run: |
           pip install platformio esptool
           set -o pipefail
@@ -46,16 +38,13 @@ jobs:
         if: failure()
         run: |
           [ -f build.log ] || exit 0
-          grep -E "error:|Error [0-9]|undefined reference|fatal error|region .* overflowed|No such file" build.log \
+          grep -E "error:|Error[: ]|undefined reference|fatal error|overflowed|No such file|greater than" build.log \
             | sed 's#^/home/runner/work/[^/]*/[^/]*/##' | sort -u | head -40 \
             | while IFS= read -r l; do echo "::error::$l"; done
 
       - name: Empacotar
         run: |
-          sudo chown -R "$USER" bootloader/build || true
-          ESPTOOL=esptool.py bash tools/flash.sh --merge
-          cp bootloader/build/bootloader/bootloader.bin out/
-          cp .pio/build/cardputer-adv/partitions.bin out/
+          bash tools/flash.sh --merge
           ls -la out/
           grep -E "^(RAM|Flash):" build.log || true
 
@@ -70,10 +59,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VER=$(grep -oP 'OS_VERSION = "\K[^"]+' src/core/Config.h)
+          cat > notes.md <<'NOTES'
+          ## Instalar pelo M5Launcher
+
+          1. Copie **`orbita-launcher.bin`** para o cartao SD.
+          2. No Launcher: **SD** -> escolha o arquivo -> **Install**.
+          3. O Launcher cria a particao de dados do Orbita (`orbitafs`, a "flash interna") sozinho.
+
+          Para escolher entre o Orbita e outro firmware: ligue o Cardputer (ou aperte **BtnRst**) e aperte uma tecla na tela do Launcher.
+
+          | Arquivo | Para que serve |
+          |---|---|
+          | `orbita-launcher.bin` | Orbita com a tabela de particoes. Use este no Launcher. Tambem pode ser gravado sozinho em `0x0` (sem o Launcher). |
+          | `orbita-app.bin` | So o programa, sem tabela (o Launcher nao cria a flash interna; notas ficam so no SD). |
+          NOTES
+          sed -i 's/^          //' notes.md
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest \
-            out/orbita-full.bin out/orbita-os.bin out/bootloader.bin out/partitions.bin \
-            out/GLIDE-LICENSE.txt out/GLIDE-NOTICES.txt \
+          gh release create latest out/orbita-launcher.bin out/orbita-app.bin \
             --target "$GITHUB_SHA" --latest \
-            --title "Orbita $VER (build $GITHUB_RUN_NUMBER)" \
-            --notes-file .github/release-notes.md
+            --title "Orbita $VER (build $GITHUB_RUN_NUMBER)" --notes-file notes.md

@@ -5,25 +5,17 @@
 #include <algorithm>
 
 #include "../core/Config.h"
-#include "../core/Glide.h"
 #include "../core/Kernel.h"
 #include "../core/Theme.h"
 #include "../core/Storage.h"
 #include "FilesApp.h"
-#include "LanApp.h"
 #include "NotesApp.h"
 #include "PresenterApp.h"
 #include "SettingsApp.h"
 #include "SystemApp.h"
-#include "UsbApp.h"
-#include "WifiApp.h"
 
 void HomeApp::rebuild() {
   items_.clear();
-  const bool hasGlide = glide::present();
-
-  items_.push_back({"GLIDE", hasGlide ? "Sintetizador  (BtnRst volta)" : "Nao gravado: use o orbita-full.bin",
-                    ui::Icon::Wave, 0, 'g', []() { Kernel::get().launchGlide(); }});
   items_.push_back({"Apresentacao", "Passar slides + cronometro", ui::Icon::Slides, 0, 'a',
                     []() { Kernel::get().push(new PresenterApp()); }});
   items_.push_back({"Notas", "Bloco de notas", ui::Icon::Note, 0, 'n',
@@ -32,13 +24,7 @@ void HomeApp::rebuild() {
                       storage::Vol v = storage::sdOk() ? storage::Vol::SD : storage::Vol::Flash;
                       Kernel::get().push(new FilesApp(v, "/"));
                     }});
-  items_.push_back({"Rede", "Arquivos pelo navegador", ui::Icon::Globe, 0, 'r',
-                    []() { Kernel::get().push(new LanApp()); }});
-  items_.push_back({"USB", "Cartao SD como pendrive", ui::Icon::Usb, 0, 'u',
-                    []() { Kernel::get().push(new UsbApp()); }});
-  items_.push_back({"Wi-Fi", "Redes salvas", ui::Icon::Wifi, 0, 'w',
-                    []() { Kernel::get().push(new WifiApp()); }});
-  items_.push_back({"Ajustes", "Tela, cores, sons, boot", ui::Icon::Gear, 0, 'j',
+  items_.push_back({"Ajustes", "Tela, cores e sons", ui::Icon::Gear, 0, 'j',
                     []() { Kernel::get().push(new SettingsApp()); }});
   items_.push_back({"Sistema", "Memoria, particoes, bateria", ui::Icon::Chip, 0, 's',
                     []() { Kernel::get().push(new SystemApp()); }});
@@ -61,7 +47,7 @@ void HomeApp::onKey(const KeyEvent& e) {
     if (items_[sel_].open) items_[sel_].open();
     return;
   } else if (e.ch) {
-    // Atalho: letra do app (g = GLIDE, a = Apresentacao, n = Notas...)
+    // Atalho: letra do app (a = Apresentacao, n = Notas...)
     for (const Item& it : items_) {
       if (it.hotkey && it.hotkey == e.ch) {
         if (it.open) it.open();

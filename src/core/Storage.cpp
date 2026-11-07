@@ -13,12 +13,10 @@ namespace storage {
 static bool sdMounted = false;
 static bool flashMounted = false;
 static bool spiStarted = false;
-static bool sdLock = false;
 
 // ------------------------------------------------------------ montagem
 
 bool begin() {
-  if (sdLock) return false;
   if (sdMounted) return true;
   if (!spiStarted) {
     SPI.begin(cfg::SD_SCK, cfg::SD_MISO, cfg::SD_MOSI, cfg::SD_CS);
@@ -41,19 +39,7 @@ bool beginFlash() {
   return flashMounted;
 }
 
-void unmountSD() {
-  if (sdMounted) SD.end();
-  sdMounted = false;
-}
-
-bool remountSD() {
-  unmountSD();
-  return begin();
-}
-
-bool sdOk() { return sdMounted && !sdLock; }
-void lockSD(bool locked) { sdLock = locked; }
-bool sdLocked() { return sdLock; }
+bool sdOk() { return sdMounted; }
 bool flashOk() { return flashMounted; }
 bool ok(Vol v) { return v == Vol::SD ? sdOk() : flashMounted; }
 
@@ -91,7 +77,6 @@ void ensureDirs() {
   if (flashMounted) {
     if (!LittleFS.exists(cfg::DIR_ROOT)) LittleFS.mkdir(cfg::DIR_ROOT);
     if (!LittleFS.exists(cfg::DIR_NOTES)) LittleFS.mkdir(cfg::DIR_NOTES);
-    if (!LittleFS.exists(cfg::DIR_SYS)) LittleFS.mkdir(cfg::DIR_SYS);
   }
 }
 

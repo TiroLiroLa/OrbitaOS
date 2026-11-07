@@ -251,8 +251,8 @@ void FilesApp::render(M5Canvas& c, const Rect& area) {
     c.setTextColor(t.fg);
     c.setTextDatum(middle_center);
     const char* msg = vol_ == storage::Vol::SD
-                          ? (storage::sdLocked() ? "Cartao com o computador" : "Sem cartao SD")
-                          : "Flash interna indisponivel";
+                          ? "Sem cartao SD"
+                          : "Sem flash interna (instale pelo Launcher)";
     c.drawString(msg, cfg::SCREEN_W / 2, area.y + 40);
     c.setFont(ui::small());
     c.setTextColor(t.dim);

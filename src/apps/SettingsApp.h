@@ -10,7 +10,7 @@ class SettingsApp : public App {
   void render(M5Canvas& c, const Rect& area) override;
 
  private:
-  enum Row { Brightness, Dim, Accent, Autoboot, Sound, Reboot, RowCount };
+  enum Row { Brightness, Dim, Accent, Sound, Reboot, RowCount };
   void change(int row, int dir);  // dir: -1, +1, ou 0 (Enter)
   String valueText(int row) const;
   ui::ListView lv_;

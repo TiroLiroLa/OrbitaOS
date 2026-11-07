@@ -5,7 +5,7 @@
 #include "../core/App.h"
 #include "../core/UI.h"
 
-// Tela inicial: carrossel com o GLIDE e os apps do Orbita.
+// Tela inicial: carrossel com os apps do Orbita.
 class HomeApp : public App {
  public:
   const char* title() const override { return "Inicio"; }

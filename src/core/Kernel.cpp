@@ -1,16 +1,12 @@
 #include "Kernel.h"
 
-#include <esp_flash.h>
 #include <esp_system.h>
 #include <math.h>
 
 #include "../apps/HomeApp.h"
 #include "Config.h"
 #include "Dialogs.h"
-#include "Net.h"
-#include "Glide.h"
 #include "Hid.h"
-#include "UsbDrive.h"
 #include "Storage.h"
 #include "Theme.h"
 #include "UI.h"
@@ -42,36 +38,17 @@ void Kernel::begin() {
     canvas_.createSprite(cfg::SCREEN_W, cfg::SCREEN_H);
   }
 
-  customBoot_ = detectCustomBootloader();
   storage::begin();
-  hid::beginUsb();    // teclado USB (controle de apresentacao) - antes de iniciar o USB
-  usbdrive::begin();  // registra o cartao como pendrive (desligado ate abrir o app USB)
-  net::begin();
+  hid::beginUsb();    // teclado USB (controle de apresentacao)
 
-  Serial.printf("[orbita] v%s | bootloader %s | reset: %s | heap livre %u\n", cfg::OS_VERSION,
-                customBoot_ ? "Orbita" : "padrao", resetReasonText(), ESP.getFreeHeap());
+  Serial.printf("[orbita] v%s | reset: %s | heap livre %u\n", cfg::OS_VERSION, resetReasonText(),
+                ESP.getFreeHeap());
 
   bootSequence();
 
   push(new HomeApp());
   applyOps();
   input_.clear();
-}
-
-bool Kernel::detectCustomBootloader() {
-  const size_t n = cfg::BOOT_SCAN_BYTES;
-  uint8_t* buf = (uint8_t*)malloc(n);
-  if (!buf) return false;
-  bool found = false;
-  if (esp_flash_read(nullptr, buf, 0x0, n) == ESP_OK) {
-    const size_t ml = strlen(cfg::BOOT_MARK);
-    for (size_t i = 0; i + ml <= n && !found; i++) {
-      if (buf[i] == (uint8_t)cfg::BOOT_MARK[0] && memcmp(buf + i, cfg::BOOT_MARK, ml) == 0)
-        found = true;
-    }
-  }
-  free(buf);
-  return found;
 }
 
 void Kernel::bootSequence() {
@@ -100,30 +77,6 @@ void Kernel::bootSequence() {
     delay(16);
   }
 
-  // Abrir o GLIDE automaticamente? So ao ligar, e qualquer tecla cancela.
-  if (!settings_.autoboot || !glide::present()) return;
-  if (esp_reset_reason() != ESP_RST_POWERON) return;
-
-  const uint32_t wait = 2000;
-  const uint32_t t0 = millis();
-  while (millis() - t0 < wait) {
-    M5Cardputer.update();
-    if (M5Cardputer.Keyboard.isPressed()) {
-      // Espera soltar para a tecla nao vazar para o menu
-      while (M5Cardputer.Keyboard.isPressed()) {
-        M5Cardputer.update();
-        delay(10);
-      }
-      return;
-    }
-    float left = (wait - (millis() - t0)) / 1000.0f;
-    drawProgress("Abrindo o GLIDE",
-                 "qualquer tecla fica no " + String(cfg::OS_NAME) + " (" + String(left, 1) + "s)",
-                 1.0f - left * 1000.0f / wait);
-    delay(30);
-  }
-  String err;
-  glide::launch(err);  // nao retorna se der certo
 }
 
 // ================================================================ pilha
@@ -192,7 +145,6 @@ void Kernel::loop() {
     applyOps();
   }
 
-  net::update();
   handlePower(now);
   if (!stack_.empty()) stack_.back()->update(now);
   applyOps();
@@ -303,25 +255,15 @@ void Kernel::drawStatusBar(M5Canvas& c, const char* title) {
     c.setTextDatum(top_left);
   }
 
-  // SD, Wi-Fi e aviso de bootloader (da direita para a esquerda)
+  // Cartao SD e Bluetooth (da direita para a esquerda)
   int x = cfg::SCREEN_W - 68;
   if (storage::sdOk()) {
     c.setTextColor(t.dim, t.panel);
     c.drawString("SD", x, 3);
   }
-  x -= 14;
-  net::State ns = net::state();
-  if (ns != net::State::Off && ns != net::State::Failed) {
-    uint16_t col = net::online() ? t.accent : t.dim;
-    int wx = x + 5, wy = 11;
-    c.fillCircle(wx, wy, 1, col);
-    c.fillArc(wx, wy, 5, 4, 225, 315, col);
-    c.fillArc(wx, wy, 8, 7, 225, 315, col);
-  }
-  x -= 22;
-  if (!customBoot_) {
-    c.setTextColor(t.warn, t.panel);
-    c.drawString("BL!", x, 3);
+  if (hid::bleConnected()) {
+    c.setTextColor(t.accent, t.panel);
+    c.drawString("BT", x - 16, 3);
   }
 }
 
@@ -379,28 +321,7 @@ void Kernel::textInput(const String& title, const String& initial,
 
 // ================================================================ fluxos
 
-void Kernel::launchGlide() {
-  if (!glide::present()) {
-    toast("GLIDE nao gravado: grave o orbita-full.bin", 3500);
-    return;
-  }
-  auto go = [this]() {
-    drawProgress("Abrindo o GLIDE", "BtnRst volta ao " + String(cfg::OS_NAME), 1.0f);
-    String err;
-    if (!glide::launch(err)) toast(err, 3000);
-  };
-  if (!customBoot_) {
-    confirm("Bootloader padrao",
-            "Sem o bootloader Orbita, o BtnRst NAO volta ao sistema (so regravando "
-            "pelo USB). Abrir mesmo assim?",
-            go, "Abrir", "Cancelar");
-  } else {
-    go();
-  }
-}
-
 void Kernel::rebootToOS() {
-  glide::selectSystem();
   delay(50);
   esp_restart();
 }

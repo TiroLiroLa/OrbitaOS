@@ -1,12 +1,12 @@
 #pragma once
 #include <Arduino.h>
 
-// Ajustes do sistema, guardados em /.orbita/ajustes na flash interna (LittleFS).
+// Ajustes do sistema, guardados na NVS (namespace "orbita"), o lugar padrao
+// para ajustes de apps no M5Launcher.
 struct Settings {
   uint8_t  brightness = 140;   // 0..255
   uint16_t dimSecs    = 30;    // 0 = nunca escurece
   uint8_t  accent     = 0;     // indice em theme::ACCENTS
-  bool     autoboot   = false; // ao ligar, abre o GLIDE (qualquer tecla cancela)
   bool     sound      = true;  // cliques do sistema
 
   // Controle de apresentacao

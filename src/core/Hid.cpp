@@ -1,17 +1,17 @@
 #include "Hid.h"
 
-#ifndef ORBITA_USB_MSC
-#define ORBITA_USB_MSC 0
+#ifndef ORBITA_USB_HID
+#define ORBITA_USB_HID 0
 #endif
 
 // ======================================================================= USB
 
-#if ORBITA_USB_MSC && !ARDUINO_USB_MODE
+#if ORBITA_USB_HID && !ARDUINO_USB_MODE
 #include "USB.h"
 #include "USBHIDKeyboard.h"
 #define ORBITA_HAS_USB_HID 1
 // Objeto global: registra a interface de teclado antes da enumeracao do USB
-// (junto com o disco do modo pendrive e a serial).
+// (junto com a serial).
 static USBHIDKeyboard usbKeyboard;
 #else
 #define ORBITA_HAS_USB_HID 0
@@ -172,7 +172,10 @@ void setBattery(uint8_t) {}
 // ---------------------------------------------------------------- USB
 
 #if ORBITA_HAS_USB_HID
-void beginUsb() { usbKeyboard.begin(); }
+void beginUsb() {
+  usbKeyboard.begin();
+  USB.begin();  // se o nucleo ja iniciou o USB (serial), nao faz nada
+}
 bool usbSupported() { return true; }
 bool usbConnected() { return (bool)USB; }
 
