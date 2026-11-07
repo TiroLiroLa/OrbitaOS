@@ -20,7 +20,7 @@ void FilesApp::load() {
   if (vol_ == storage::Vol::SD) storage::begin();  // tenta montar se o cartao entrou agora
 
   if (storage::ok(vol_) && !storage::exists(vol_, path_)) path_ = "/";
-  title_ = String(install_ ? "Instalar " : "") + volShort(vol_) + ":" + path_;
+  title_ = String(volShort(vol_)) + ":" + path_;
 
   if (!storage::ok(vol_)) {
     lv_.setCount(0);
@@ -38,7 +38,6 @@ void FilesApp::load() {
       uint32_t size = isDir ? 0 : (uint32_t)f.size();
       f.close();
       if (name.length() == 0 || name[0] == '.') continue;  // ocultos
-      if (install_ && !isDir && !storage::hasExt(name, ".bin")) continue;
       if (entries_.size() >= MAX_ENTRIES) { truncated_ = true; break; }
       entries_.push_back({name, isDir, size});
     }
@@ -67,9 +66,7 @@ void FilesApp::switchVolume() {
 void FilesApp::openFile(const Entry& en) {
   Kernel& k = Kernel::get();
   String full = fullPath(en);
-  if (storage::hasExt(en.name, ".bin") && vol_ == storage::Vol::SD) {
-    k.installWithUI(full, vol_);
-  } else if (storage::isTextName(en.name)) {
+  if (storage::isTextName(en.name)) {
     k.push(new EditorApp(vol_, full));
   } else {
     // Formato desconhecido: oferece ver como texto
@@ -135,8 +132,6 @@ void FilesApp::menu() {
     const Entry en = entries_[lv_.sel];
     const String full = fullPath(en);
     if (!en.dir) {
-      if (storage::hasExt(en.name, ".bin") && vol_ == storage::Vol::SD)
-        add("Instalar em um slot", [this, full]() { Kernel::get().installWithUI(full, vol_); });
       add("Editar como texto", [this, full]() { Kernel::get().push(new EditorApp(vol_, full)); });
       add("Ver como texto", [this, full]() {
         Kernel::get().push(new EditorApp(vol_, full, true));
@@ -220,7 +215,7 @@ void FilesApp::onKey(const KeyEvent& e) {
     if (!storage::ok(vol_)) { load(); return; }  // tenta montar de novo
     openSelected();
   } else if (e.nav == Nav::Back) {
-    if (path_ == "/" || (install_ && path_ == cfg::DIR_APPS)) {
+    if (path_ == "/") {
       k.pop();
     } else {
       String leaving = storage::baseName(path_);
@@ -229,8 +224,6 @@ void FilesApp::onKey(const KeyEvent& e) {
       for (size_t i = 0; i < entries_.size(); i++)  // volta a selecao para a pasta de onde saimos
         if (entries_[i].name == leaving) { lv_.sel = (int)i; break; }
     }
-  } else if (install_) {
-    return;  // no modo instalar, so navegacao
   } else if (e.nav == Nav::Tab || e.nav == Nav::Del || e.ch == 'm') {
     if (storage::ok(vol_)) menu();
   } else if (e.ch == 'c' && !entries_.empty()) {
@@ -272,17 +265,8 @@ void FilesApp::render(M5Canvas& c, const Rect& area) {
   if (entries_.empty()) {
     c.setFont(ui::small());
     c.setTextColor(t.dim);
-    if (install_) {
-      ui::drawWrapped(c,
-                      String("Nenhum .bin aqui. Copie os apps (ex.: hazke-v1.4.0-app.bin, "
-                             "GLIDE.bin) para ") +
-                          cfg::DIR_APPS + " no cartao SD (pelo USB, pela rede ou no PC).",
-                      10, area.y + 14, area.w - 20, 11);
-      ui::drawHint(c, "` voltar");
-    } else {
-      c.drawString("Pasta vazia", 10, area.y + 14);
-      ui::drawHint(c, "tab menu   f volume   ` voltar");
-    }
+    c.drawString("Pasta vazia", 10, area.y + 14);
+    ui::drawHint(c, "tab menu   f volume   ` voltar");
     return;
   }
 
@@ -291,11 +275,10 @@ void FilesApp::render(M5Canvas& c, const Rect& area) {
     const Entry& en = entries_[i];
     ui::drawRowBg(c, r, sel);
     c.setFont(ui::small());
-    bool bin = storage::hasExt(en.name, ".bin");
     bool txt = storage::isTextName(en.name);
     bool inClip = clip_.active && clip_.vol == vol_ && clip_.path == fullPath(en);
-    c.setTextColor(en.dir ? t.accent : (bin ? t.ok : (txt ? t.fg : t.dim)));
-    c.drawString(en.dir ? "[]" : (bin ? "<>" : (txt ? "==" : " -")), r.x + 8, r.y + 5);
+    c.setTextColor(en.dir ? t.accent : (txt ? t.fg : t.dim));
+    c.drawString(en.dir ? "[]" : (txt ? "==" : " -"), r.x + 8, r.y + 5);
     c.setTextColor(inClip ? t.accent : (sel ? t.fg : t.dim));
     String size = en.dir ? String("") : storage::humanSize(en.size);
     int sw = c.textWidth(size.c_str());
@@ -308,7 +291,6 @@ void FilesApp::render(M5Canvas& c, const Rect& area) {
   ui::drawScrollbar(c, list, lv_);
 
   if (truncated_) ui::drawHint(c, "Mostrando os 200 primeiros");
-  else if (install_) ui::drawHint(c, "OK instalar   ` voltar");
   else if (clip_.active) ui::drawHint(c, "v colar aqui   tab menu   ` voltar");
   else ui::drawHint(c, "OK abrir  tab menu  c/x/v copiar  f volume");
 }

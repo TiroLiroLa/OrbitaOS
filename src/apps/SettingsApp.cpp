@@ -8,7 +8,7 @@ static const uint16_t DIM_STEPS[] = {0, 15, 30, 60, 120, 300};
 static constexpr int DIM_COUNT = sizeof(DIM_STEPS) / sizeof(DIM_STEPS[0]);
 
 static const char* LABELS[] = {"Brilho", "Escurecer tela", "Cor de destaque",
-                               "Abrir ultimo app ao ligar", "Sons do sistema",
+                               "Abrir o GLIDE ao ligar", "Sons do sistema",
                                "Reiniciar o Orbita"};
 
 void SettingsApp::onEnter() {

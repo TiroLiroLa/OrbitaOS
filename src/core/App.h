@@ -29,6 +29,7 @@ class App {
   virtual bool overlay() const { return false; }     // desenha por cima do app anterior
   virtual bool fullscreen() const { return false; }  // esconde a barra de status
   virtual bool animating() const { return false; }   // pede quadros continuos
+  virtual bool keepAwake() const { return false; }   // impede a tela de escurecer
 
   void invalidate() { dirty_ = true; }
   bool dirty() const { return dirty_; }

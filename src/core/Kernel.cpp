@@ -8,6 +8,8 @@
 #include "Config.h"
 #include "Dialogs.h"
 #include "Net.h"
+#include "Glide.h"
+#include "Hid.h"
 #include "UsbDrive.h"
 #include "Storage.h"
 #include "Theme.h"
@@ -26,6 +28,7 @@ void Kernel::begin() {
   Serial.begin(115200);
 
   M5Cardputer.Display.setRotation(1);
+  storage::beginFlash();  // os ajustes ficam na flash interna
   settings_.load();
   applyTheme();
   applyBrightness();
@@ -41,9 +44,8 @@ void Kernel::begin() {
 
   customBoot_ = detectCustomBootloader();
   storage::begin();
-  storage::beginFlash();
+  hid::beginUsb();    // teclado USB (controle de apresentacao) - antes de iniciar o USB
   usbdrive::begin();  // registra o cartao como pendrive (desligado ate abrir o app USB)
-  slots_.begin();
   net::begin();
 
   Serial.printf("[orbita] v%s | bootloader %s | reset: %s | heap livre %u\n", cfg::OS_VERSION,
@@ -98,10 +100,8 @@ void Kernel::bootSequence() {
     delay(16);
   }
 
-  // Abrir o ultimo app automaticamente? So ao ligar, e qualquer tecla cancela.
-  int last = settings_.lastSlot;
-  if (!settings_.autoboot || last < 0 || last >= slots_.count() || !slots_.slot(last).valid)
-    return;
+  // Abrir o GLIDE automaticamente? So ao ligar, e qualquer tecla cancela.
+  if (!settings_.autoboot || !glide::present()) return;
   if (esp_reset_reason() != ESP_RST_POWERON) return;
 
   const uint32_t wait = 2000;
@@ -117,13 +117,13 @@ void Kernel::bootSequence() {
       return;
     }
     float left = (wait - (millis() - t0)) / 1000.0f;
-    drawProgress("Abrindo " + slots_.slot(last).name,
-                 "qualquer tecla abre o " + String(cfg::OS_NAME) + " (" + String(left, 1) + "s)",
+    drawProgress("Abrindo o GLIDE",
+                 "qualquer tecla fica no " + String(cfg::OS_NAME) + " (" + String(left, 1) + "s)",
                  1.0f - left * 1000.0f / wait);
     delay(30);
   }
   String err;
-  slots_.launch(last, err);  // nao retorna se der certo
+  glide::launch(err);  // nao retorna se der certo
 }
 
 // ================================================================ pilha
@@ -221,7 +221,8 @@ void Kernel::handlePower(uint32_t now) {
       forceRedraw_ = true;
     }
   }
-  if (settings_.dimSecs && !dimmed_ &&
+  bool awake = !stack_.empty() && stack_.back()->keepAwake();
+  if (settings_.dimSecs && !dimmed_ && !awake &&
       now - input_.lastActivity() > (uint32_t)settings_.dimSecs * 1000) {
     dimmed_ = true;
     uint8_t low = settings_.brightness / 8;
@@ -378,75 +379,19 @@ void Kernel::textInput(const String& title, const String& initial,
 
 // ================================================================ fluxos
 
-bool Kernel::installToSlot(const String& path, storage::Vol vol, int slot, String& err) {
-  const String appName = SlotManager::prettyName(path);
-  int lastPct = -1;
-  drawProgress("Instalando " + appName, storage::baseName(path), 0);
-  bool ok = slots_.installFromFile(slot, storage::fs(vol), path, err,
-                                   [&](size_t done, size_t total) {
-    int p = (int)(done * 100 / (total ? total : 1));
-    if (p != lastPct) {
-      lastPct = p;
-      drawProgress("Instalando " + appName, storage::baseName(path), p / 100.0f);
-    }
-  });
-  input_.clear();
-  forceRedraw_ = true;
-  if (ok && settings_.sound) beep(1800, 60);
-  return ok;
-}
-
-void Kernel::installWithUI(const String& path, storage::Vol vol) {
-  if (slots_.count() == 0) {
-    toast("Tabela de particoes sem slots");
+void Kernel::launchGlide() {
+  if (!glide::present()) {
+    toast("GLIDE nao gravado: grave o orbita-full.bin", 3500);
     return;
   }
-  std::vector<String> opts;
-  for (int i = 0; i < slots_.count(); i++) {
-    const SlotInfo& s = slots_.slot(i);
-    opts.push_back("Slot " + String(i + 1) + ": " + (s.valid ? s.name : String("(vazio)")));
-  }
-  const String appName = SlotManager::prettyName(path);
-
-  choose("Instalar " + appName + " em:", opts, [this, path, appName, vol](int i) {
-    auto doInstall = [this, path, appName, vol, i]() {
-      String err;
-      if (!installToSlot(path, vol, i, err)) {
-        toast("Falhou: " + err, 4000);
-        return;
-      }
-      confirm("Instalado!",
-              appName + " esta no slot " + String(i + 1) + ". Abrir agora?",
-              [this, i]() { launchSlot(i); }, "Abrir", "Depois");
-    };
-
-    const SlotInfo& s = slots_.slot(i);
-    if (s.valid) {
-      confirm("Substituir?",
-              "O slot " + String(i + 1) + " tem " + s.name +
-                  ". Saves no SD e no LittleFS continuam.",
-              doInstall, "Substituir", "Cancelar");
-    } else {
-      doInstall();
-    }
-  });
-}
-
-void Kernel::launchSlot(int i) {
-  if (i < 0 || i >= slots_.count() || !slots_.slot(i).valid) {
-    toast("Slot vazio");
-    return;
-  }
-  auto go = [this, i]() {
-    settings_.lastSlot = (int8_t)i;
-    settings_.save();
-    drawProgress("Abrindo " + slots_.slot(i).name, "RST volta ao " + String(cfg::OS_NAME), 1.0f);
+  auto go = [this]() {
+    drawProgress("Abrindo o GLIDE", "BtnRst volta ao " + String(cfg::OS_NAME), 1.0f);
     String err;
-    if (!slots_.launch(i, err)) toast(err, 3000);
+    if (!glide::launch(err)) toast(err, 3000);
   };
   if (!customBoot_) {
     confirm("Bootloader padrao",
-            "Sem o bootloader Orbita, o botao RST NAO volta ao sistema (so regravando "
+            "Sem o bootloader Orbita, o BtnRst NAO volta ao sistema (so regravando "
             "pelo USB). Abrir mesmo assim?",
             go, "Abrir", "Cancelar");
   } else {
@@ -455,7 +400,7 @@ void Kernel::launchSlot(int i) {
 }
 
 void Kernel::rebootToOS() {
-  SlotManager::selectFactory();
+  glide::selectSystem();
   delay(50);
   esp_restart();
 }

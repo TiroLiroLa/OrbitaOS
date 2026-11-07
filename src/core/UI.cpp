@@ -262,6 +262,18 @@ void drawIcon(M5Canvas& c, Icon icon, int cx, int cy, int s, uint16_t col, uint1
                           col);
       break;
     }
+    case Icon::Slides: {  // tela de projecao com um grafico e um "play"
+      int w = s * 76 / 100, hh = s * 50 / 100;
+      int x = cx - w / 2, y = cy - hh / 2 - s / 12;
+      c.fillRoundRect(x, y, w, hh, 3, col);
+      c.fillTriangle(cx - s / 10, y + hh / 4, cx - s / 10, y + hh * 3 / 4, cx + s / 7, y + hh / 2,
+                     bg);
+      int lw = s / 16 + 1;
+      c.drawWideLine(cx, y + hh, cx, y + hh + s / 7, lw, col);
+      c.drawWideLine(cx - s / 6, y + hh + s / 5, cx, y + hh + s / 10, lw, col);
+      c.drawWideLine(cx + s / 6, y + hh + s / 5, cx, y + hh + s / 10, lw, col);
+      break;
+    }
     case Icon::Generic:
     default: {
       int r = s * 36 / 100;

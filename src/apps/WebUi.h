@@ -25,15 +25,12 @@ td.a button{padding:4px 8px;font-size:13px}
 .drop.hot{border-color:var(--acc);color:var(--fg)}
 .prog{height:6px;background:#20263a;border-radius:3px;overflow:hidden;margin-top:6px;display:none}
 .prog i{display:block;height:100%;width:0;background:var(--acc)}
-.slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin:10px 0}
-.slot{background:var(--panel);border-radius:10px;padding:10px}.slot small{color:var(--dim);display:block}
 #msg{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--fg);color:#000;padding:8px 14px;border-radius:8px;display:none}
 .dim{color:var(--dim)}
 </style></head><body>
 <header><b>&#9711; Orbita</b><span id="ver"></span></header>
 <main>
 <div class="tabs" id="vols"></div>
-<div class="slots" id="slots"></div>
 <div class="bar"><div class="crumb" id="crumb"></div>
 <button onclick="mk()">Nova pasta</button><button onclick="list()">Atualizar</button></div>
 <label class="drop" id="drop">Solte arquivos aqui ou <u>clique para enviar</u>
@@ -42,7 +39,7 @@ td.a button{padding:4px 8px;font-size:13px}
 <table id="tbl"></table>
 </main><div id="msg"></div>
 <script>
-const $=s=>document.querySelector(s);let vol='sd',path='/',slots=[];
+const $=s=>document.querySelector(s);let vol='sd',path='/';
 const enc=encodeURIComponent;
 function fmt(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';if(b<1073741824)return(b/1048576).toFixed(2)+' MB';return(b/1073741824).toFixed(2)+' GB'}
 function msg(t){const m=$('#msg');m.textContent=t;m.style.display='block';clearTimeout(m.t);m.t=setTimeout(()=>m.style.display='none',3000)}
@@ -52,7 +49,7 @@ function join(a,b){return a.endsWith('/')?a+b:a+'/'+b}
 function esc(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function info(){const j=await(await api('/api/info')).json();$('#ver').textContent='v'+j.version;
  $('#vols').innerHTML=j.volumes.map(v=>`<button class="${v.key==vol?'on':''}" ${v.ok?'':'disabled'} onclick="setVol('${v.key}')">${esc(v.name)} <span class="dim">${v.ok?fmt(v.used)+' / '+fmt(v.total):'indisponivel'}</span></button>`).join('');
- slots=j.slots;$('#slots').innerHTML=j.slots.map(s=>`<div class="slot"><b>Slot ${s.i+1}</b> ${s.valid?esc(s.name):'<span class="dim">vazio</span>'}<small>${s.valid?esc(s.version):'instale um .bin do cartao'}</small>${s.valid?`<button onclick="launch(${s.i})">Abrir no Cardputer</button>`:''}</div>`).join('')}
+
 function setVol(v){vol=v;path='/';info();list()}
 let cur=[],crumbs=[];
 function fp(i){return join(path,cur[i].n)}
@@ -61,17 +58,14 @@ async function list(){let j;try{j=await(await api(`/api/list?vol=${vol}&path=${e
  path=j.path;const parts=path.split('/').filter(x=>x);let acc='';crumbs=['/'];parts.forEach(p=>{acc+='/'+p;crumbs.push(acc)});
  $('#crumb').innerHTML=crumbs.map((c,i)=>`<a onclick="go(crumbs[${i}])">${i?esc(parts[i-1]):vol.toUpperCase()+':/'}</a>`).join(' / ');
  cur=j.entries.sort((a,b)=>(b.d-a.d)||a.n.localeCompare(b.n));
- let rows=cur.map((e,i)=>{const full=join(path,e.n);const bin=!e.d&&vol=='sd'&&e.n.toLowerCase().endsWith('.bin');
-  return `<tr><td class="n">${e.d?'&#128193; ':''}<a ${e.d?`onclick="go(fp(${i}))"`:`href="/api/download?vol=${vol}&path=${enc(full)}"`}>${esc(e.n)}</a></td><td class="s">${e.d?'':fmt(e.s)}</td><td class="a">${bin?`<button onclick="inst(fp(${i}))">Instalar</button> `:''}<button onclick="ren(fp(${i}))">Renomear</button> <button onclick="del(fp(${i}),${e.d})">Apagar</button></td></tr>`});
+ let rows=cur.map((e,i)=>{const full=join(path,e.n);
+  return `<tr><td class="n">${e.d?'&#128193; ':''}<a ${e.d?`onclick="go(fp(${i}))"`:`href="/api/download?vol=${vol}&path=${enc(full)}"`}>${esc(e.n)}</a></td><td class="s">${e.d?'':fmt(e.s)}</td><td class="a"><button onclick="ren(fp(${i}))">Renomear</button> <button onclick="del(fp(${i}),${e.d})">Apagar</button></td></tr>`});
  if(path!='/')rows.unshift('<tr><td class="n"><a onclick="up()">..</a></td><td></td><td></td></tr>');
  $('#tbl').innerHTML=rows.join('')||'<tr><td class="dim">Pasta vazia</td></tr>'}
 function go(p){path=p;list()}
 async function mk(){const n=prompt('Nome da nova pasta');if(!n)return;try{await post('/api/mkdir',{vol,path:join(path,n)});list()}catch(e){msg(e.message)}}
 async function ren(f){const old=f.split('/').pop();const n=prompt('Novo nome',old);if(!n||n==old)return;try{await post('/api/rename',{vol,from:f,to:join(path,n)});list()}catch(e){msg(e.message)}}
 async function del(f,d){if(!confirm('Apagar '+f+(d?' e tudo dentro?':'?')))return;try{await post('/api/delete',{vol,path:f});list();info()}catch(e){msg(e.message)}}
-async function inst(f){const opts=slots.map(s=>`${s.i+1} = ${s.valid?s.name:'vazio'}`).join('\n');const n=prompt('Instalar em qual slot?\n'+opts,'1');if(!n)return;
- try{await post('/api/install',{path:f,slot:parseInt(n)-1});msg('Instalando... acompanhe na tela do Cardputer');setTimeout(info,20000)}catch(e){msg(e.message)}}
-async function launch(i){if(!confirm('Abrir o slot '+(i+1)+' no Cardputer? (o Orbita reinicia)'))return;try{await post('/api/launch',{slot:i});msg('Abrindo...')}catch(e){msg(e.message)}}
 function upload(files){files=[...files];if(!files.length)return;const bar=$('#prog'),fill=bar.firstElementChild;
  let i=0;const next=()=>{if(i>=files.length){bar.style.display='none';$('#up').textContent='Enviado!';list();info();return}
   const f=files[i++];const fd=new FormData();fd.append('file',f,f.name);const x=new XMLHttpRequest();

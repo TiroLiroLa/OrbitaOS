@@ -35,9 +35,8 @@ bool begin() {
 
 bool beginFlash() {
   if (flashMounted) return true;
-  // Mesmo comportamento do Hazke: formata so se a particao ainda nao tiver
-  // um LittleFS valido (primeiro uso).
-  flashMounted = LittleFS.begin(true, "/littlefs", 10, "spiffs");
+  // Formata so se a particao ainda nao tiver um LittleFS valido (primeiro uso)
+  flashMounted = LittleFS.begin(true, "/littlefs", 10, cfg::FLASH_FS_LABEL);
   if (flashMounted) ensureDirs();
   return flashMounted;
 }
@@ -87,12 +86,12 @@ Vol notesVol() { return sdOk() ? Vol::SD : Vol::Flash; }
 void ensureDirs() {
   if (sdMounted) {
     if (!SD.exists(cfg::DIR_ROOT)) SD.mkdir(cfg::DIR_ROOT);
-    if (!SD.exists(cfg::DIR_APPS)) SD.mkdir(cfg::DIR_APPS);
     if (!SD.exists(cfg::DIR_NOTES)) SD.mkdir(cfg::DIR_NOTES);
   }
   if (flashMounted) {
     if (!LittleFS.exists(cfg::DIR_ROOT)) LittleFS.mkdir(cfg::DIR_ROOT);
     if (!LittleFS.exists(cfg::DIR_NOTES)) LittleFS.mkdir(cfg::DIR_NOTES);
+    if (!LittleFS.exists(cfg::DIR_SYS)) LittleFS.mkdir(cfg::DIR_SYS);
   }
 }
 

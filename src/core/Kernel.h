@@ -8,11 +8,10 @@
 #include "App.h"
 #include "Input.h"
 #include "Settings.h"
-#include "SlotManager.h"
 #include "Storage.h"
 
 // O "nucleo" do Orbita: inicializa o hardware, mantem a pilha de apps,
-// distribui teclas, desenha a tela e cuida de energia e dos slots.
+// distribui teclas, desenha a tela, cuida de energia e abre o GLIDE.
 class Kernel {
  public:
   static Kernel& get();
@@ -37,11 +36,7 @@ class Kernel {
                  std::function<void(const String&)> onOk, int maxLen = 32);
 
   // Fluxos do sistema
-  void installWithUI(const String& path,   // escolhe slot, grava com progresso
-                     storage::Vol vol = storage::Vol::SD);
-  // Grava direto num slot, mostrando o progresso na tela (usado tambem pela web)
-  bool installToSlot(const String& path, storage::Vol vol, int slot, String& err);
-  void launchSlot(int slot);               // avisa se o bootloader nao for o Orbita
+  void launchGlide();                      // avisa se o bootloader nao for o Orbita
   void rebootToOS();
 
   // Desenho direto na tela (para tarefas que bloqueiam, ex.: gravar flash)
@@ -54,7 +49,6 @@ class Kernel {
 
   Input& input() { return input_; }
   Settings& settings() { return settings_; }
-  SlotManager& slots() { return slots_; }
   bool customBootloader() const { return customBoot_; }
   const char* resetReasonText() const;
 
@@ -77,7 +71,6 @@ class Kernel {
   M5Canvas canvas_;
   Input input_;
   Settings settings_;
-  SlotManager slots_;
 
   bool customBoot_ = false;
   bool forceRedraw_ = true;

@@ -10,7 +10,7 @@
 class WebServer;
 
 // Arquivos pela rede: um servidor web no Cardputer com gerenciador de arquivos
-// (SD e flash), envio de arquivos, instalar .bin num slot e abrir apps.
+// (SD e flash): enviar, baixar, renomear e apagar arquivos.
 // Protegido por usuario "orbita" + PIN mostrado na tela. Funciona ligado a um
 // roteador ou criando a propria rede (o celular conecta direto no Cardputer).
 class LanApp : public App {
@@ -39,8 +39,6 @@ class LanApp : public App {
   void handleRename();
   void handleUploadData();
   void handleUploadDone();
-  void handleInstall();
-  void handleLaunch();
 
   std::unique_ptr<WebServer> server_;
   bool serverOn_ = false;
@@ -55,9 +53,4 @@ class LanApp : public App {
   String upError_;
   size_t upBytes_ = 0;
   uint32_t upLastDraw_ = 0;
-
-  // pedidos que precisam rodar fora do servidor (bloqueiam a tela)
-  String pendingInstall_;
-  int pendingSlot_ = -1;
-  int pendingLaunch_ = -1;
 };

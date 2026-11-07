@@ -6,8 +6,7 @@
 
 // Armazenamento do Orbita: dois "volumes".
 //   Vol::SD    - cartao microSD (FAT32), o principal
-//   Vol::Flash - LittleFS na particao "spiffs" (1 MB), funciona sem cartao.
-//                E compartilhado com os apps dos slots (o Hazke salva aqui).
+//   Vol::Flash - LittleFS na particao "orbitafs" (~3,3 MB), funciona sem cartao.
 namespace storage {
 
 enum class Vol : uint8_t { SD = 0, Flash = 1 };

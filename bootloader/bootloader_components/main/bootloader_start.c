@@ -11,10 +11,10 @@
  *   - Qualquer outro reset (ligar, botao RST, USB, watchdog de hardware...):
  *       ignora o otadata e carrega a particao "factory" -> volta ao Orbita.
  *
- * Assim o Orbita abre um app com esp_ota_set_boot_partition() + esp_restart(),
- * e o botao RST sempre traz o usuario de volta, sem precisar mexer no app.
- * Apps que reiniciam a si mesmos (ex.: GLIDE segurando a tecla `) continuam
- * reiniciando neles mesmos, porque isso tambem e um reset por software.
+ * Assim o Orbita abre o GLIDE (particao "glide") com esp_ota_set_boot_partition()
+ * + esp_restart(), e o botao RST sempre traz o usuario de volta, sem mexer no
+ * GLIDE. Quando o GLIDE se reinicia sozinho (segurando a tecla `), continua
+ * nele mesmo, porque isso tambem e um reset por software.
  */
 #include <stdbool.h>
 #include "sdkconfig.h"

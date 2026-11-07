@@ -1,10 +1,15 @@
 # Compila o bootloader e o sistema na nuvem do GitHub a cada push.
-# Os arquivos prontos aparecem em Actions -> (execucao) -> Artifacts -> "orbita".
+# - Os arquivos prontos ficam em Actions -> (execucao) -> Artifacts -> "orbita".
+# - Na branch main, tambem sao publicados em Releases -> "latest", com link fixo:
+#   https://github.com/<usuario>/<repo>/releases/latest/download/orbita-full.bin
 name: build
 
 on:
   push:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -34,7 +39,16 @@ jobs:
       - name: Sistema Orbita (PlatformIO)
         run: |
           pip install platformio esptool
-          pio run -e cardputer-adv
+          set -o pipefail
+          pio run -e cardputer-adv 2>&1 | tee build.log
+
+      - name: Mostrar erros de compilacao
+        if: failure()
+        run: |
+          [ -f build.log ] || exit 0
+          grep -E "error:|Error [0-9]|undefined reference|fatal error|region .* overflowed|No such file" build.log \
+            | sed 's#^/home/runner/work/[^/]*/[^/]*/##' | sort -u | head -40 \
+            | while IFS= read -r l; do echo "::error::$l"; done
 
       - name: Empacotar
         run: |
@@ -42,8 +56,24 @@ jobs:
           ESPTOOL=esptool.py bash tools/flash.sh --merge
           cp bootloader/build/bootloader/bootloader.bin out/
           cp .pio/build/cardputer-adv/partitions.bin out/
+          ls -la out/
+          grep -E "^(RAM|Flash):" build.log || true
 
       - uses: actions/upload-artifact@v4
         with:
           name: orbita
           path: out/
+
+      - name: Publicar em Releases (latest)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(grep -oP 'OS_VERSION = "\K[^"]+' src/core/Config.h)
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest \
+            out/orbita-full.bin out/orbita-os.bin out/bootloader.bin out/partitions.bin \
+            out/GLIDE-LICENSE.txt out/GLIDE-NOTICES.txt \
+            --target "$GITHUB_SHA" --latest \
+            --title "Orbita $VER (build $GITHUB_RUN_NUMBER)" \
+            --notes-file .github/release-notes.md

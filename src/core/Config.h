@@ -7,17 +7,22 @@
 namespace cfg {
 
 constexpr const char* OS_NAME    = "Orbita";
-constexpr const char* OS_VERSION = "0.1.0";
+constexpr const char* OS_VERSION = "0.3.0";
 
 constexpr int SCREEN_W = 240;
 constexpr int SCREEN_H = 135;
 constexpr int STATUS_H = 14;   // barra de status no topo
 
-// Pastas no cartao SD
+// Pastas
 constexpr const char* DIR_ROOT     = "/orbita";
-constexpr const char* DIR_APPS     = "/orbita/apps";   // coloque os .bin aqui
-constexpr const char* DIR_LAUNCHER = "/apps";          // compatibilidade com o M5Launcher
-constexpr const char* DIR_NOTES    = "/orbita/notas";  // no SD ou na flash interna
+constexpr const char* DIR_NOTES    = "/orbita/notas";   // no SD ou na flash interna
+constexpr const char* DIR_SYS      = "/.orbita";        // flash interna, oculta
+constexpr const char* FILE_SETTINGS = "/.orbita/ajustes";
+constexpr const char* FILE_WIFI     = "/.orbita/wifi";
+
+// Particoes (ver partitions.csv)
+constexpr const char* GLIDE_PARTITION = "glide";
+constexpr const char* FLASH_FS_LABEL  = "orbitafs";
 
 // Rede
 constexpr const char* HOSTNAME     = "orbita";         // http://orbita.local

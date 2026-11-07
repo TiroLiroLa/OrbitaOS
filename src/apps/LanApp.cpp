@@ -5,6 +5,7 @@
 #include <esp_random.h>
 
 #include "../core/Config.h"
+#include "../core/Glide.h"
 #include "../core/Kernel.h"
 #include "../core/Theme.h"
 #include "../core/UI.h"
@@ -98,32 +99,6 @@ void LanApp::update(uint32_t now) {
   }
   if (serverOn_) server_->handleClient();
 
-  Kernel& k = Kernel::get();
-  if (pendingInstall_.length()) {
-    String path = pendingInstall_;
-    int slot = pendingSlot_;
-    pendingInstall_ = "";
-    String err;
-    if (k.installToSlot(path, storage::Vol::SD, slot, err)) {
-      lastAction_ = "Instalado no slot " + String(slot + 1);
-      k.toast(lastAction_);
-    } else {
-      lastAction_ = "Falhou: " + err;
-      k.toast(lastAction_, 4000);
-    }
-    invalidate();
-  }
-  if (pendingLaunch_ >= 0) {
-    int s = pendingLaunch_;
-    pendingLaunch_ = -1;
-    // deixa a resposta HTTP sair antes de reiniciar
-    for (int i = 0; i < 20; i++) {
-      server_->handleClient();
-      delay(10);
-    }
-    stopServer();
-    k.launchSlot(s);
-  }
   (void)now;
 }
 
@@ -162,7 +137,7 @@ bool LanApp::argPath(const char* name, storage::Vol& vol, String& path) {
   }
   path = server_->arg(name);
   if (path.length() == 0) path = "/";
-  if (!storage::safePath(path)) {
+  if (!storage::safePath(path) || path.indexOf("/.") >= 0) {  // /.orbita = arquivos do sistema
     server_->send(400, "text/plain", "Caminho invalido");
     return false;
   }
@@ -186,14 +161,11 @@ void LanApp::routes() {
   s.on("/api/mkdir", HTTP_POST, [this]() { handleMkdir(); });
   s.on("/api/rename", HTTP_POST, [this]() { handleRename(); });
   s.on("/api/upload", HTTP_POST, [this]() { handleUploadDone(); }, [this]() { handleUploadData(); });
-  s.on("/api/install", HTTP_POST, [this]() { handleInstall(); });
-  s.on("/api/launch", HTTP_POST, [this]() { handleLaunch(); });
   s.onNotFound([this]() { server_->send(404, "text/plain", "Nao encontrado"); });
 }
 
 void LanApp::handleInfo() {
   if (!auth()) return;
-  Kernel& k = Kernel::get();
   String j = "{\"name\":\"" + String(cfg::OS_NAME) + "\",\"version\":\"" + cfg::OS_VERSION +
              "\",\"volumes\":[";
   for (int i = 0; i < storage::VOL_COUNT; i++) {
@@ -204,14 +176,7 @@ void LanApp::handleInfo() {
          ",\"used\":" + String((double)storage::usedBytes(v), 0) +
          ",\"total\":" + String((double)storage::totalBytes(v), 0) + "}";
   }
-  j += "],\"slots\":[";
-  for (int i = 0; i < k.slots().count(); i++) {
-    const SlotInfo& si = k.slots().slot(i);
-    if (i) j += ",";
-    j += "{\"i\":" + String(i) + ",\"valid\":" + (si.valid ? "true" : "false") +
-         ",\"name\":\"" + jsonEsc(si.name) + "\",\"version\":\"" + jsonEsc(si.version) + "\"}";
-  }
-  j += "]}";
+  j += "],\"glide\":" + String(glide::present() ? "true" : "false") + "}";
   server_->send(200, "application/json", j);
 }
 
@@ -232,6 +197,7 @@ void LanApp::handleList() {
     bool d = f.isDirectory();
     uint32_t sz = d ? 0 : (uint32_t)f.size();
     f.close();
+    if (n.length() == 0 || n[0] == '.') continue;  // ocultos (ajustes, senhas Wi-Fi)
     if (!first) j += ",";
     first = false;
     j += "{\"n\":\"" + jsonEsc(n) + "\",\"d\":" + (d ? "1" : "0") + ",\"s\":" + String(sz) + "}";
@@ -292,7 +258,8 @@ void LanApp::handleRename() {
   String from, to;
   if (!argPath("from", vol, from)) return;
   to = server_->arg("to");
-  if (!storage::safePath(to) || !storage::validName(storage::baseName(to))) {
+  if (!storage::safePath(to) || to.indexOf("/.") >= 0 ||
+      !storage::validName(storage::baseName(to))) {
     server_->send(400, "text/plain", "Nome invalido");
     return;
   }
@@ -314,7 +281,8 @@ void LanApp::handleUploadData() {
     String name = storage::baseName(up.filename);
     if (!storage::volFromKey(server_->arg("vol"), vol) || !storage::ok(vol)) {
       upError_ = "Volume indisponivel";
-    } else if (!storage::safePath(dir) || !storage::validName(name)) {
+    } else if (!storage::safePath(dir) || dir.indexOf("/.") >= 0 || !storage::validName(name) ||
+               name[0] == '.') {
       upError_ = "Nome ou pasta invalidos";
     } else {
       upFile_ = storage::fs(vol).open(storage::joinPath(dir, name), FILE_WRITE);
@@ -352,37 +320,6 @@ void LanApp::handleUploadDone() {
   if (!auth()) return;
   if (upError_.length()) server_->send(500, "text/plain", upError_);
   else server_->send(200, "text/plain", "ok");
-}
-
-void LanApp::handleInstall() {
-  if (!auth()) return;
-  String path = server_->arg("path");
-  int slot = server_->arg("slot").toInt();
-  Kernel& k = Kernel::get();
-  if (!storage::safePath(path) || !storage::hasExt(path, ".bin") ||
-      !storage::exists(storage::Vol::SD, path)) {
-    server_->send(400, "text/plain", "Arquivo .bin nao encontrado no SD");
-    return;
-  }
-  if (slot < 0 || slot >= k.slots().count()) {
-    server_->send(400, "text/plain", "Slot invalido");
-    return;
-  }
-  pendingInstall_ = path;
-  pendingSlot_ = slot;
-  server_->send(200, "text/plain", "ok");
-}
-
-void LanApp::handleLaunch() {
-  if (!auth()) return;
-  int slot = server_->arg("slot").toInt();
-  Kernel& k = Kernel::get();
-  if (slot < 0 || slot >= k.slots().count() || !k.slots().slot(slot).valid) {
-    server_->send(400, "text/plain", "Slot vazio");
-    return;
-  }
-  pendingLaunch_ = slot;
-  server_->send(200, "text/plain", "ok");
 }
 
 // ------------------------------------------------------------ tela

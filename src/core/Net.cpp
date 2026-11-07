@@ -1,11 +1,11 @@
 #include "Net.h"
 
-#include <Preferences.h>
 #include <WiFi.h>
 #include <algorithm>
 #include <esp_random.h>
 
 #include "Config.h"
+#include "KvFile.h"
 
 namespace net {
 
@@ -21,34 +21,18 @@ static String apName, apPass, err;
 
 static void loadKnown() {
   knownList.clear();
-  Preferences p;
-  if (!p.begin("orbwifi", true)) return;
-  for (int i = 0; i < cfg::MAX_KNOWN_WIFI; i++) {
-    char ks[4], kp[4];
-    snprintf(ks, sizeof(ks), "s%d", i);
-    snprintf(kp, sizeof(kp), "p%d", i);
-    String s = p.getString(ks, "");
-    if (s.length()) knownList.push_back({s, p.getString(kp, "")});
+  KvFile kv(cfg::FILE_WIFI);
+  kv.load();
+  for (const auto& it : kv.items()) {
+    if ((int)knownList.size() >= cfg::MAX_KNOWN_WIFI) break;
+    knownList.push_back({it.key, it.value});
   }
-  p.end();
 }
 
 static void saveKnown() {
-  Preferences p;
-  if (!p.begin("orbwifi", false)) return;
-  for (int i = 0; i < cfg::MAX_KNOWN_WIFI; i++) {
-    char ks[4], kp[4];
-    snprintf(ks, sizeof(ks), "s%d", i);
-    snprintf(kp, sizeof(kp), "p%d", i);
-    if (i < (int)knownList.size()) {
-      p.putString(ks, knownList[i].ssid);
-      p.putString(kp, knownList[i].pass);
-    } else {
-      p.remove(ks);
-      p.remove(kp);
-    }
-  }
-  p.end();
+  KvFile kv(cfg::FILE_WIFI);
+  for (const auto& k : knownList) kv.set(k.ssid, k.pass);
+  kv.save();
 }
 
 static void remember(const String& s, const String& pw) {
@@ -71,7 +55,10 @@ static const Known* findKnown(const String& s) {
 
 // ------------------------------------------------------------ API
 
-void begin() { loadKnown(); }
+void begin() {
+  WiFi.persistent(false);  // o Orbita guarda as redes dele; nada na NVS do Wi-Fi
+  loadKnown();
+}
 
 State state() { return st; }
 

@@ -47,7 +47,8 @@ String ellipsize(M5Canvas& c, const String& text, int maxW);
 
 // Icones vetoriais simples
 enum class Icon : uint8_t {
-  Generic, Planet, Wave, Folder, Install, Gear, Chip, Empty, Power, Note, Globe, Usb, Wifi, Grid
+  Generic, Planet, Wave, Folder, Install, Gear, Chip, Empty, Power, Note, Globe, Usb, Wifi, Grid,
+  Slides
 };
 void drawIcon(M5Canvas& c, Icon icon, int cx, int cy, int size, uint16_t color, uint16_t bg,
               char letter = 0);

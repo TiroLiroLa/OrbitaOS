@@ -6,13 +6,11 @@
 #include "../core/UI.h"
 
 // Gerenciador de arquivos local: cartao SD e flash interna.
-// Abrir texto, instalar .bin, copiar/recortar/colar (inclusive entre volumes),
+// Abrir texto, copiar/recortar/colar (inclusive entre volumes),
 // renomear, nova pasta, novo arquivo, apagar (pastas inteiras tambem).
-// No modo "instalar" mostra so pastas e .bin.
 class FilesApp : public App {
  public:
-  FilesApp(storage::Vol vol, const String& startDir, bool installMode = false)
-      : vol_(vol), path_(startDir), install_(installMode) {}
+  FilesApp(storage::Vol vol, const String& startDir) : vol_(vol), path_(startDir) {}
   const char* title() const override { return title_.c_str(); }
   void onEnter() override { load(); }
   void onResume() override { load(); }
@@ -42,7 +40,6 @@ class FilesApp : public App {
 
   storage::Vol vol_;
   String path_;
-  bool install_;
   String title_;
   std::vector<Entry> entries_;
   ui::ListView lv_;

@@ -1,16 +1,18 @@
 # Orbita OS - tabela de particoes para o Cardputer ADV (flash de 8 MB)
 #
-#  factory  = o proprio Orbita (sempre volta pra ca num reset por botao/liga-desliga)
-#             1,875 MB: cabe Wi-Fi + servidor web + USB + M5Cardputer com folga
-#  ota_0/1  = dois "slots" de 2,5 MB para firmwares inteiros (ex.: Hazke e GLIDE)
-#  spiffs   = LittleFS compartilhado ("flash interna" no gerenciador de arquivos;
-#             o Hazke guarda os saves internos aqui)
+#  nvs      = 64 KB. Compartilhada com o GLIDE, que guarda os ajustes dele aqui e
+#             pode limpar a area se ela encher. Por isso o Orbita NAO guarda os
+#             ajustes dele aqui: ficam em /.orbita na particao orbitafs.
+#  factory  = o Orbita (3 MB). Ligar ou apertar BtnRst sempre volta para ca.
+#  glide    = o GLIDE original, embutido (1,5 MB; o GLIDE.bin tem ~0,95 MB).
+#  orbitafs = LittleFS: "flash interna" (notas, arquivos, ajustes do Orbita).
+#             Subtipo proprio (0x40) de proposito: assim nenhum firmware que
+#             procure uma particao "spiffs" consegue formata-la por engano.
 #
 # Name,     Type, SubType,  Offset,   Size
-nvs,        data, nvs,      0x9000,   0x5000
-otadata,    data, ota,      0xE000,   0x2000
-factory,    app,  factory,  0x10000,  0x1E0000
-app0,       app,  ota_0,    0x1F0000, 0x280000
-app1,       app,  ota_1,    0x470000, 0x280000
-spiffs,     data, spiffs,   0x6F0000, 0x100000
+nvs,        data, nvs,      0x9000,   0x10000
+otadata,    data, ota,      0x19000,  0x2000
+factory,    app,  factory,  0x20000,  0x300000
+glide,      app,  ota_0,    0x320000, 0x180000
+orbitafs,   data, 0x40,     0x4A0000, 0x350000
 coredump,   data, coredump, 0x7F0000, 0x10000

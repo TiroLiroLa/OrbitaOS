@@ -5,7 +5,7 @@
 #include "../core/App.h"
 #include "../core/UI.h"
 
-// Tela inicial: carrossel com os apps instalados nos slots e os apps nativos.
+// Tela inicial: carrossel com o GLIDE e os apps do Orbita.
 class HomeApp : public App {
  public:
   const char* title() const override { return "Inicio"; }
@@ -22,12 +22,11 @@ class HomeApp : public App {
     String sub;
     ui::Icon icon;
     char letter;
-    int slot;                      // >= 0: app externo neste slot
+    char hotkey;                   // atalho de teclado (0 = nenhum)
     std::function<void()> open;
   };
 
   void rebuild();
-  void slotMenu(int slot);
 
   std::vector<Item> items_;
   int sel_ = 0;

@@ -4,6 +4,8 @@
 #include <esp_partition.h>
 
 #include "../core/Config.h"
+#include "../core/Glide.h"
+#include "../core/Hid.h"
 #include "../core/Kernel.h"
 #include "../core/Net.h"
 #include "../core/Storage.h"
@@ -26,8 +28,7 @@ void SystemApp::collect() {
   H(String(cfg::OS_NAME) + " " + cfg::OS_VERSION);
   L("Bootloader", k.customBootloader() ? "Orbita (RST volta)" : "PADRAO - instale o Orbita");
   L("Ultimo reset", k.resetReasonText());
-  int sel = k.slots().bootSelected();
-  L("Proximo esp_restart", sel < 0 ? String("sistema") : "slot " + String(sel + 1));
+  L("Proximo esp_restart", glide::bootSelected() ? "GLIDE" : "sistema");
 
   H("Hardware");
   L("Chip", String(ESP.getChipModel()) + " rev " + String(ESP.getChipRevision()));
@@ -59,16 +60,21 @@ void SystemApp::collect() {
   }
   L("Redes salvas", String((int)net::known().size()));
 
-  H("Slots de apps");
-  for (int i = 0; i < k.slots().count(); i++) {
-    const SlotInfo& s = k.slots().slot(i);
-    String v = String("vazio");
-    if (s.valid) {
-      v = s.name;
-      if (s.version.length()) v += " " + s.version;
-    }
-    L("Slot " + String(i + 1), v);
+  H("GLIDE (embutido)");
+  if (glide::present()) {
+    L("Estado", "gravado");
+    uint32_t sz = glide::imageSize();
+    if (sz) L("Tamanho", storage::humanSize(sz));
+  } else {
+    L("Estado", "nao gravado");
   }
+  L("Autor", "Charles Tobin (CHARL3X)");
+  L("Licenca", "PolyForm Noncommercial 1.0");
+  L("Fonte", "github.com/CHARL3X");
+
+  H("Bluetooth");
+  L("Nome", hid::BLE_NAME);
+  L("Estado", hid::bleConnected() ? "conectado" : (hid::bleOn() ? "anunciando" : "desligado"));
 
   H("Particoes");
   const esp_partition_t* running = esp_ota_get_running_partition();
