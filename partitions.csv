@@ -6,7 +6,11 @@
 #   orbitafs = LittleFS = "flash interna" (notas e arquivos sem cartao SD).
 #              Subtipo littlefs (0x83), nao spiffs: firmwares que procuram uma
 #              particao SPIFFS (e a formatam) nao a encontram por engano.
-# O Launcher pode redimensionar a orbitafs; o Orbita se adapta ao tamanho.
+# Tamanho: o Launcher so respeita o tamanho declarado de uma particao de dados
+# vazia se ele passar de 5 MB (e ai exige tudo isso livre). Ate 5 MB, ele cria
+# uma area padrao de 448 KB, que da e sobra para notas. Por isso 2 MB aqui: no
+# Launcher vira 448 KB (redimensionavel no PMan); gravado sozinho, fica com 2 MB.
+# O Orbita monta pelo nome e se adapta ao tamanho que encontrar.
 #
 # Tambem funciona gravado sozinho (sem o Launcher) em 0x0.
 #
@@ -14,5 +18,5 @@
 nvs,        data, nvs,      0x9000,   0x5000
 otadata,    data, ota,      0xE000,   0x2000
 app0,       app,  ota_0,    0x10000,  0x200000
-orbitafs,   data, littlefs, 0x210000, 0x5E0000
+orbitafs,   data, littlefs, 0x210000, 0x200000
 coredump,   data, coredump, 0x7F0000, 0x10000

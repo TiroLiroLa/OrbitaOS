@@ -22,12 +22,12 @@ Tabela (`partitions.csv`):
 nvs        data  nvs        20 KB   ajustes (namespace "orbita"), vínculo Bluetooth
 otadata    data  ota         8 KB
 app0       app   ota_0       2 MB   o Órbita (~1,2 MB hoje)
-orbitafs   data  littlefs  5,9 MB   "flash interna": notas e arquivos sem cartão
+orbitafs   data  littlefs    2 MB   "flash interna": notas e arquivos sem cartão
 coredump   data  coredump   64 KB
 ```
 
 - A `orbitafs` usa o subtipo **littlefs (0x83)**, não spiffs. Assim, um firmware que procura uma partição SPIFFS, e às vezes a formata, não a encontra por engano.
-- O Launcher pode redimensionar a `orbitafs` na instalação. O Órbita monta pelo nome e se adapta ao tamanho que encontrar.
+- **Tamanho no Launcher:** para uma partição de dados vazia, o Launcher só usa o tamanho declarado se ele passar de 5 MB, e aí exige esse espaço inteiro livre. A primeira versão declarava 5,9 MB e pedia 7104 KB, mais do que cabe. Até 5 MB, ele cria uma área padrão de **448 KB**, que dá para muitas notas. Por isso a tabela declara 2 MB: no Launcher a área vira 448 KB (dá para aumentar no PMan) e, gravando sozinho, fica com 2 MB. O Órbita monta pelo nome e se adapta ao tamanho.
 - Se a partição não existir (por exemplo, com o `orbita-app.bin`), **Arquivos** mostra só o SD.
 - Os ajustes ficam na **NVS**, compartilhada com o Launcher e os outros apps (padrão do Launcher). São poucos bytes e, se sumirem, voltam ao padrão.
 
